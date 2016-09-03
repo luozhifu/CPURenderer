@@ -23,7 +23,7 @@ D3DLOCKED_RECT lockedRect;
 DWORD*	m_imageData;		//纹理对象
 
 
-
+CAM4DV1			cam;				//单个相机
 RENDERLIST4DV1 rend_list;			//单个渲染列表
 POLYF4DV1 poly1;					//单个多边形
 POINT4D	poly1_pos = { 0,0,100,1 };	//多边形世界坐标
@@ -189,6 +189,22 @@ bool Game_Init()
 	m_surface->GetDesc(&m_surfacedesc);
 
 	//初始化单个多边形
+	poly1.vlist[0].x = 0;
+	poly1.vlist[0].x = 50;
+	poly1.vlist[0].x = 0;
+	poly1.vlist[0].x = 1;
+
+	poly1.vlist[1].x = 50;
+	poly1.vlist[1].x = -50;
+	poly1.vlist[1].x = 0;
+	poly1.vlist[1].x = 1;
+
+	poly1.vlist[2].x = -50;
+	poly1.vlist[2].x = -50;
+	poly1.vlist[2].x = 0;
+	poly1.vlist[2].x = 1;
+
+	poly1.next = poly1.prev = nullptr;
 
 
 

@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SoftRenderSurface", "SoftRe
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SoftRenderD2D", "SoftRenderD2D\SoftRenderD2D.vcxproj", "{FCA1B1D7-90DE-4F32-840C-234574A114C4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SoftRenderSDL", "SoftRenderSDL\SoftRenderSDL.vcxproj", "{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{FCA1B1D7-90DE-4F32-840C-234574A114C4}.Release|x64.Build.0 = Release|x64
 		{FCA1B1D7-90DE-4F32-840C-234574A114C4}.Release|x86.ActiveCfg = Release|Win32
 		{FCA1B1D7-90DE-4F32-840C-234574A114C4}.Release|x86.Build.0 = Release|Win32
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Debug|x64.ActiveCfg = Debug|x64
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Debug|x64.Build.0 = Debug|x64
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Debug|x86.ActiveCfg = Debug|Win32
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Debug|x86.Build.0 = Debug|Win32
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Release|x64.ActiveCfg = Release|x64
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Release|x64.Build.0 = Release|x64
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Release|x86.ActiveCfg = Release|Win32
+		{EE6367AB-EA73-4D48-87C2-70C0DF83ACCC}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
