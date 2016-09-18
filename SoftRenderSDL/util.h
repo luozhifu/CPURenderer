@@ -9,6 +9,18 @@
 //渲染列表定义
 #define RENDERLIST4DV1_MAX_POLYS	32768
 
+//转换控制标志
+#define TRANSFORM_LOCAL_ONLY	0	//执行本地和世界坐标系转换
+
+#define TRANSFORM_LOCAL_TO_TRANS	2	//执行转换到本地顶点列表,仅存储结果到顶点列表
+
+
+//定义相机旋转顺序
+#define CAM_ROT_SEQ_ZYX	4
+
+float cos_look[361];
+float sin_look[361];
+
 //3d向量
 typedef struct VECTOR3D_TYP
 {
@@ -48,7 +60,7 @@ typedef struct POLYF4DV1_TYP
 
 	POLYF4DV1_TYP *next;
 	POLYF4DV1_TYP *prev;
-}POLYF4DV1,*POLYF4DV1_PTY;
+}POLYF4DV1,*POLYF4DV1_PTR;
 
 //3d 面
 typedef struct PLANE3D_TYP
@@ -126,7 +138,7 @@ typedef struct RENDERLIST4DV1_TYP
 	int state;
 	int attr;
 
-	POLYF4DV1_PTY poly_ptrs[RENDERLIST4DV1_MAX_POLYS];
+	POLYF4DV1_PTR poly_ptrs[RENDERLIST4DV1_MAX_POLYS];
 
 	POLYF4DV1 poly_data[RENDERLIST4DV1_MAX_POLYS];
 
@@ -190,6 +202,8 @@ const MATRIX4X4 IMAT_4X4 = {
 };
 
 #define  MAT_IDENTITY_4X4(m) {memcpy((void*)(m),(void*)&IMAT_4X4,sizeof(MATRIX4X4));};
+
+#define  MAT_COPY_4X4(src_mat,dest_mat) {memcpy((void*)(dest_mat),(void*)(src_mat),sizeof(MATRIX4X4));};
 
 #define PI ((float)3.141592654f)
 
@@ -317,5 +331,450 @@ void Init_CAM4DV1(CAM4DV1_PTR cam,
 
 		VECTOR3D_INITXYZ(&vn, 0,-cam->view_dist, static_cast<float>(-cam->viewplane_width / 2.0));
 		PLANE3D_Init(&cam->bt_clip_plane, &pt_origin, &vn, 1);
+	}
+}
+
+void Reset_RENDERLIST4DV1(RENDERLIST4DV1_PTR rend_list)
+{
+	rend_list->num_polys = 0;
+}
+
+
+
+int Insert_POLYF4DV1_RENDERLIST4DV1(RENDERLIST4DV1_PTR rend_list, POLYF4DV1_PTR poly)
+{
+	if (rend_list->num_polys >= RENDERLIST4DV1_MAX_POLYS)
+		return 0;
+
+	rend_list->poly_ptrs[rend_list->num_polys] = &rend_list->poly_data[rend_list->num_polys];
+
+	memcpy((void*)&rend_list->poly_data[rend_list->num_polys], (void*)poly, sizeof(POLYF4DV1));
+
+	if (rend_list->num_polys == 0)
+	{
+		rend_list->poly_data[0].next = nullptr;
+		rend_list->poly_data[0].prev = nullptr;
+	}
+	else
+	{
+		rend_list->poly_data[rend_list->num_polys].next = nullptr;
+		rend_list->poly_data[rend_list->num_polys].prev = &rend_list->poly_data[rend_list->num_polys - 1];
+
+		rend_list->poly_data[rend_list->num_polys - 1].next = &rend_list->poly_data[rend_list->num_polys];
+	}
+
+	rend_list->num_polys++;
+
+	return 1;
+}
+
+
+void Build_Sin_Cos_Tables()
+{
+	for (int ang = 0; ang < 360; ang++)
+	{
+		float theta = (float)ang*PI / (float)180;
+
+		cos_look[ang] =static_cast<float>( cos(theta));
+		sin_look[ang] = static_cast<float>(sin(theta));
+	}
+}
+
+float Fast_Sin(float theta)
+{
+	theta = fmodf(theta, 360);
+
+	if (theta < 0) theta += 360.0;
+
+	int theta_int = (int)theta;
+	float theta_frac = theta - theta_int;
+
+	return (sin_look[theta_int] + theta_frac*(sin_look[theta_int + 1] - sin_look[theta_int]));
+}
+
+float Fast_Cos(float theta)
+{
+	theta = fmodf(theta, 360);
+
+	if (theta < 0) theta += 360.0;
+
+	int theta_int = (int)theta;
+	float theta_frac = theta - theta_int;
+
+	return (cos_look[theta_int] + theta_frac*(cos_look[theta_int + 1] - cos_look[theta_int]));
+}
+
+void MAT_Init_4X4(MATRIX4X4_PTR ma,
+	float m00,float m01,float m02,float m03,
+	float m10, float m11, float m12, float m13,
+	float m20, float m21, float m22, float m23,
+	float m30, float m31, float m32, float m33
+	)
+{
+	ma->M00 = m00, ma->M01 = m01, ma->M02 = m02, ma->M03 = m03;
+	ma->M10 = m10, ma->M11 = m11, ma->M12 = m12, ma->M13 = m13;
+	ma->M20 = m20, ma->M21 = m21, ma->M22 = m22, ma->M23 = m23;
+	ma->M30 = m30, ma->M31 = m31, ma->M32 = m32, ma->M33 = m33;
+}
+
+void Build_XYZ_Rotation_MATRIX4X4(int theta_x, float theta_y, int theta_z, MATRIX4X4_PTR mrot)
+{
+	MATRIX4X4 mx, my, mz, mtmp;
+	float sin_theta = 0, cos_theta = 0;
+	int rot_seq = 0;		//1 for x,2 for y,4 for z
+
+
+	MAT_IDENTITY_4X4(mrot);
+
+	if (fabs(theta_x) > EPSILON_ES)
+		rot_seq = rot_seq | 1;
+
+	if (fabs(theta_y) > EPSILON_ES)
+		rot_seq = rot_seq | 2;
+
+	if (fabs(theta_z) > EPSILON_ES)
+		rot_seq = rot_seq | 4;
+
+
+	switch (rot_seq)
+	{
+	case 0:
+		return;
+		break;
+	case 2:
+		cos_theta = Fast_Cos(theta_y);
+		sin_theta = Fast_Sin(theta_y);
+
+		MAT_Init_4X4(&my,
+			cos_theta, 0, -sin_theta, 0,
+			0, 1, 0, 0,
+			sin_theta, 0, cos_theta, 0,
+			0, 0, 0, 1
+		);
+
+		MAT_COPY_4X4(&my, mrot);
+		return;
+	}
+}
+
+void Mat_Mul_VECTOR4D_4X4(VECTOR4D_PTR va, MATRIX4X4_PTR mb, VECTOR4D_PTR vprod)
+{
+	for (int col = 0; col < 4; col++)
+	{
+		float sum = 0;
+
+		for (int row = 0; row < 4; row++)
+		{
+			sum += (va->M[row] * mb->M[row][col]);
+		}
+
+		vprod->M[col] = sum;
+	}
+}
+
+void Transform_RENDERLIST4DV1(RENDERLIST4DV1_PTR rend_list, MATRIX4X4_PTR mt, int coord_select)
+{
+	switch (coord_select)
+	{
+	case TRANSFORM_LOCAL_ONLY:
+		for (int poly = 0; poly < rend_list->num_polys; poly++)
+		{
+			//获取当前多边形
+			POLYF4DV1_PTR curr_poly = rend_list->poly_ptrs[poly];
+
+			if((curr_poly == NULL) || !(curr_poly->state & POLY4DV1_STATE_ACTIVE) ||
+				(curr_poly->state & POLY4DV1_STATE_CLIPPED) || 
+				(curr_poly->state & POLY4DV1_STATE_BACKFACE))
+
+				continue;
+
+			//开始转换
+			for (int vertex = 0; vertex < 3; vertex++)
+			{
+				POINT4D presult;
+
+				Mat_Mul_VECTOR4D_4X4(&curr_poly->vlist[vertex], mt, &presult);
+
+				VECTOR4D_COPY(&curr_poly->vlist[vertex], &presult);
+			}
+		}
+
+		break;
+	}
+}
+
+
+
+void VECTOR4D_Add(VECTOR4D_PTR va, VECTOR4D_PTR vb, VECTOR4D_PTR vsum)
+{
+	vsum->x = va->x + vb->x;
+	vsum->y = va->y + vb->y;
+	vsum->z = va->z + vb->z;
+	vsum->w = 1;
+}
+
+void Model_To_World_RENDERLIST4DV1(RENDERLIST4DV1_PTR rend_list, POINT4D_PTR world_pos,int coord_select=TRANSFORM_LOCAL_TO_TRANS)
+{
+
+	if (coord_select == TRANSFORM_LOCAL_TO_TRANS)
+	{
+		for (int poly = 0; poly < rend_list->num_polys; poly++)
+		{
+			POLYF4DV1_PTR curr_poly = rend_list->poly_ptrs[poly];
+
+			if ((curr_poly == NULL) || !(curr_poly->state & POLY4DV1_STATE_ACTIVE) ||
+				(curr_poly->state & POLY4DV1_STATE_CLIPPED) ||
+				(curr_poly->state & POLY4DV1_STATE_BACKFACE))
+
+				continue;
+
+			//开始转换
+			for (int vertex = 0; vertex < 3; vertex++)
+			{
+				VECTOR4D_Add(&curr_poly->vlist[vertex], world_pos, &curr_poly->tvlist[vertex]);
+			}
+		}
+	}
+}
+
+void Mat_Mul_4X4(MATRIX4X4_PTR ma, MATRIX4X4_PTR mb, MATRIX4X4_PTR mprod)
+{
+	for (int row = 0; row < 4; row++)
+	{
+		for (int col = 0; col < 4; col++)
+		{
+			float sum = 0;
+			for (int index = 0; index < 4; index++)
+			{
+				sum += (ma->M[row][index] * mb->M[index][col]);
+			}
+
+			mprod->M[row][col] = sum;
+		}
+	}
+}
+
+void Build_CAM4DV1_Matrix_Euler(CAM4DV1_PTR cam, int cam_rot_seq)
+{
+
+
+	MATRIX4X4 mt_inv,
+		mx_inv,
+		my_inv,
+		mz_inv,
+		mrot,
+		mtmp;
+
+
+	//创建相机逆矩阵
+	MAT_Init_4X4(&mt_inv,
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
+		-cam->pos.x, -cam->pos.y, -cam->pos.z, 1);
+
+	//建立反向旋转顺序
+
+	float theta_x = cam->dir.x;
+	float theta_y = cam->dir.y;
+	float theta_z = cam->dir.z;
+
+
+	float cos_theta = Fast_Cos(theta_x);
+	float sin_theta = -Fast_Sin(theta_x);
+
+	MAT_Init_4X4(&mx_inv,
+		1, 0, 0, 0,
+		0, cos_theta, sin_theta, 0,
+		0, -sin_theta, cos_theta, 0,
+		0, 0, 0, 1);
+
+	cos_theta = Fast_Cos(theta_y);
+	sin_theta = -Fast_Sin(theta_y);
+
+	MAT_Init_4X4(&my_inv,
+		cos_theta, 0, -sin_theta, 0,
+		0, 1, 0, 0,
+		sin_theta, 0, cos_theta, 0,
+		0, 0, 0, 1);
+
+	cos_theta = Fast_Cos(theta_z);
+	sin_theta = -Fast_Sin(theta_z);
+
+	MAT_Init_4X4(&mz_inv,
+		cos_theta, 0, sin_theta, 0,
+		-sin_theta, cos_theta, 0, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1);
+
+	switch (cam_rot_seq)
+	{
+	case CAM_ROT_SEQ_ZYX:
+		Mat_Mul_4X4(&mz_inv, &my_inv, &mtmp);
+		Mat_Mul_4X4(&mtmp, &mx_inv, &mrot);
+		break;
+	}
+
+
+	Mat_Mul_4X4(&mt_inv, &mrot, &cam->mcam);
+}
+
+
+void World_To_Camera_RENDERLIST4DV1(RENDERLIST4DV1_PTR rend_list, CAM4DV1_PTR cam)
+{
+	for (int poly = 0; poly < rend_list->num_polys; poly++)
+	{
+		POLYF4DV1_PTR curr_poly = rend_list->poly_ptrs[poly];
+
+		if ((curr_poly == NULL) || !(curr_poly->state & POLY4DV1_STATE_ACTIVE) ||
+			(curr_poly->state & POLY4DV1_STATE_CLIPPED) ||
+			(curr_poly->state & POLY4DV1_STATE_BACKFACE))
+
+			continue;
+
+		//开始转换
+		for (int vertex = 0; vertex < 3; vertex++)
+		{
+			POINT4D presult;
+
+			Mat_Mul_VECTOR4D_4X4(&curr_poly->tvlist[vertex], &cam->mcam, &presult);
+
+			VECTOR4D_COPY(&curr_poly->tvlist[vertex], &presult);
+		}
+	}
+}
+
+
+
+void Camera_To_Perspective_RENDERLIST4DV1(RENDERLIST4DV1_PTR rend_list, CAM4DV1_PTR cam)
+{
+	for (int poly = 0; poly < rend_list->num_polys; poly++)
+	{
+		POLYF4DV1_PTR curr_poly = rend_list->poly_ptrs[poly];
+
+		if ((curr_poly == NULL) || !(curr_poly->state & POLY4DV1_STATE_ACTIVE) ||
+			(curr_poly->state & POLY4DV1_STATE_CLIPPED) ||
+			(curr_poly->state & POLY4DV1_STATE_BACKFACE))
+
+			continue;
+
+		//开始转换
+		for (int vertex = 0; vertex < 3; vertex++)
+		{
+			float z = curr_poly->tvlist[vertex].z;
+
+			curr_poly->tvlist[vertex].x = cam->view_dist * curr_poly->tvlist[vertex].x / z;
+			curr_poly->tvlist[vertex].y = cam->view_dist * curr_poly->tvlist[vertex].y * cam->aspect_ratio/z;
+		}
+	}
+}
+
+
+
+void Perspective_To_Screen_RENDERLIST4DV1(RENDERLIST4DV1* rend_list, CAM4DV1* cam)
+{
+	for (int poly = 0; poly < rend_list->num_polys; poly++)
+	{
+		POLYF4DV1_PTR curr_poly = rend_list->poly_ptrs[poly];
+
+		if ((curr_poly == NULL) || !(curr_poly->state & POLY4DV1_STATE_ACTIVE) ||
+			(curr_poly->state & POLY4DV1_STATE_CLIPPED) ||
+			(curr_poly->state & POLY4DV1_STATE_BACKFACE))
+			continue;
+
+		float alpha = (0.5*cam->viewport_width - 0.5);
+		float beta = (0.5*cam->viewport_height - 0.5);
+
+
+		//开始转换
+		for (int vertex = 0; vertex < 3; vertex++)
+		{
+			curr_poly->tvlist[vertex].x = alpha + alpha * curr_poly->tvlist[vertex].x;
+			curr_poly->tvlist[vertex].y = beta  - beta  * curr_poly->tvlist[vertex].y;
+		}
+	}
+}
+
+
+void setPixels(int x, int y, UINT color, UINT* pixels, int lpitch)
+{
+	int index = (int)(lpitch * y + x);
+
+	pixels[index] = color;
+}
+
+void drawLine(int x1, int y1, int x2, int y2, UINT color, UINT* pixels, int lpitch)
+{
+	int dx = x2 - x1;
+	int dy = y2 - y1;
+	int ux = ((dx > 0) << 1) - 1;//x的增量方向,取1或-1
+	int uy = ((dy > 0) << 1) - 1;//y的增量方向,取1或-1
+
+	dx = abs(dx);
+	dy = abs(dy);
+
+	int x = x1, y = y1;
+	int eps = 0;
+
+	//线段靠近x轴
+	if (dx > dy)
+	{
+		for (x = x1; x != x2 + ux; x += ux)
+		{
+			setPixels(x, y, color, pixels, lpitch);
+			eps += dy;
+			if ((eps << 1) >= dx)
+			{
+				y += uy;
+				eps -= dx;
+			}
+		}
+	}
+	else
+	{
+		for (y = y1; y != y2 + uy; y += uy)
+		{
+			setPixels(x, y, color, pixels, lpitch);
+			eps += dx;
+			if ((eps << 1) >= dy)
+			{
+				x += ux;
+				eps -= dy;
+			}
+		}
+	}
+}
+
+void Draw_RENDERLIST4DV1_Wire16(RENDERLIST4DV1_PTR rend_list, UINT* pixels, int lpitch)
+{
+	for (int poly = 0; poly < rend_list->num_polys; poly++)
+	{
+		POLYF4DV1_PTR curr_poly = rend_list->poly_ptrs[poly];
+
+		if ((curr_poly == NULL) || !(curr_poly->state & POLY4DV1_STATE_ACTIVE) ||
+			(curr_poly->state & POLY4DV1_STATE_CLIPPED) ||
+			(curr_poly->state & POLY4DV1_STATE_BACKFACE))
+			continue;
+
+		drawLine(curr_poly->tvlist[0].x,
+			curr_poly->tvlist[0].y,
+			curr_poly->tvlist[1].x,
+			curr_poly->tvlist[1].y,
+			curr_poly->color,
+			pixels, lpitch);
+
+		drawLine(curr_poly->tvlist[1].x,
+			curr_poly->tvlist[1].y,
+			curr_poly->tvlist[2].x,
+			curr_poly->tvlist[2].y,
+			curr_poly->color,
+			pixels, lpitch);
+
+		drawLine(curr_poly->tvlist[2].x,
+			curr_poly->tvlist[2].y,
+			curr_poly->tvlist[0].x,
+			curr_poly->tvlist[0].y,
+			curr_poly->color,
+			pixels, lpitch);
 	}
 }

@@ -9,8 +9,8 @@
 
 #pragma warning(disable:4244) //全部关掉
 
-#define SCREEN_WIDTH 640            //窗口尺寸
-#define SCREEN_HEIGHT 480
+#define SCREEN_WIDTH 400            //窗口尺寸
+#define SCREEN_HEIGHT 400
 
 
 SDL_Window* gWindow = nullptr;//渲染的窗口
@@ -79,23 +79,31 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
+
 void Game_Init()
 {
+	//初始化数学引擎
+	Build_Sin_Cos_Tables();
+
 	//初始化单个多边形
+	poly1.state = POLY4DV1_STATE_ACTIVE;
+	poly1.color = 0xFF00FF00;
+	poly1.attr = 0;
+
 	poly1.vlist[0].x = 0;
-	poly1.vlist[0].x = 50;
-	poly1.vlist[0].x = 0;
-	poly1.vlist[0].x = 1;
+	poly1.vlist[0].y = 50;
+	poly1.vlist[0].z = 0;
+	poly1.vlist[0].w = 1;
 
 	poly1.vlist[1].x = 50;
-	poly1.vlist[1].x = -50;
-	poly1.vlist[1].x = 0;
-	poly1.vlist[1].x = 1;
+	poly1.vlist[1].y = -50;
+	poly1.vlist[1].z = 0;
+	poly1.vlist[1].w = 1;
 
 	poly1.vlist[2].x = -50;
-	poly1.vlist[2].x = -50;
-	poly1.vlist[2].x = 0;
-	poly1.vlist[2].x = 1;
+	poly1.vlist[2].y = -50;
+	poly1.vlist[2].z = 0;
+	poly1.vlist[2].w = 1;
 
 	poly1.next = poly1.prev = nullptr;
 
@@ -167,64 +175,50 @@ void close()
 	SDL_Quit();
 }
 
-void setPixels(int x, int y, UINT color)
-{
-	int index = (int)(SCREEN_WIDTH * y + x);
-
-	pixels[index] = color;
-}
-
-void drawLine(int x1, int y1, int x2, int y2, UINT color)
-{
-	int dx = x2 - x1;
-	int dy = y2 - y1;
-	int ux = ((dx > 0) << 1) - 1;//x的增量方向,取1或-1
-	int uy = ((dy > 0) << 1) - 1;//y的增量方向,取1或-1
-
-	dx = abs(dx);
-	dy = abs(dy);
-
-	int x = x1, y = y1;
-	int eps = 0;
-
-	//线段靠近x轴
-	if (dx > dy)
-	{
-		for (x = x1; x != x2 + ux; x += ux)
-		{
-			setPixels(x, y, color);
-			eps += dy;
-			if ((eps << 1) >= dx)
-			{
-				y += uy;
-				eps -= dx;
-			}
-		}
-	}
-	else
-	{
-		for (y = y1; y != y2 + uy; y += uy)
-		{
-			setPixels(x, y, color);
-			eps += dx;
-			if ((eps << 1) >= dy)
-			{
-				x += ux;
-				eps -= dy;
-			}
-		}
-	}
-}
 
 
 //游戏循环
 void GAME_Main()
 {
-	//设置像素点
-	setPixels(10, 10, 0xFF0000);
-	setPixels(20, 20, 0x00FF00);
+	static MATRIX4X4 mrot;
+	static float ang_y = 0;
 
-	drawLine(50, 50, 100, 100, 0xFF0000);
+	//设置像素点
+	//setPixels(10, 10, 0xFF0000);
+	//setPixels(20, 20, 0x00FF00);
+
+	//drawLine(50, 50, 100, 100, 0xFF0000);
+
+	//初始化渲染列表
+	Reset_RENDERLIST4DV1(&rend_list);
+
+	//多边形插入渲染列表
+	Insert_POLYF4DV1_RENDERLIST4DV1(&rend_list, &poly1);
+
+	Build_XYZ_Rotation_MATRIX4X4(0, ang_y, 0, &mrot);
+
+	if (++ang_y > 360.0) 
+		ang_y = 0;
+
+	Transform_RENDERLIST4DV1(&rend_list, &mrot, TRANSFORM_LOCAL_ONLY);
+
+	//执行 本地/模型 到世界转换
+	Model_To_World_RENDERLIST4DV1(&rend_list, &poly1_pos);
+
+	//生成相机矩阵
+	Build_CAM4DV1_Matrix_Euler(&cam, CAM_ROT_SEQ_ZYX);
+
+	//应用世界坐标到相机坐标
+	World_To_Camera_RENDERLIST4DV1(&rend_list, &cam);
+
+	//应用相机坐标到投影
+	Camera_To_Perspective_RENDERLIST4DV1(&rend_list, &cam);
+
+	//应用屏幕转换
+	Perspective_To_Screen_RENDERLIST4DV1(&rend_list, &cam);
+
+	//渲染多边形
+	Draw_RENDERLIST4DV1_Wire16(&rend_list,pixels, SCREEN_WIDTH);
 }
 
 //位图绘制循环
