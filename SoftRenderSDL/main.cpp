@@ -29,13 +29,10 @@ UINT pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
 POINT4D cam_pos = { 0,0,-100,1 };
 VECTOR4D cam_dir = { 0,0,0,1 };
 
-
-VECTOR4D	vscale = { 0.5,0.5,0.5 },
-vpos = { 0,0,0,1 },
-vrot = { 0,0,0,1 };
-
 CAM4DV1			cam;				//单个相机
-OBJECT4DV1		obj;				//正方形对象
+RENDERLIST4DV1 rend_list;			//单个渲染列表
+POLYF4DV1 poly1;					//单个多边形
+POINT4D	poly1_pos = { 0,0,100,1 };	//多边形世界坐标
 
 
 bool SDL_Init();//启动sdl，创建窗口
@@ -88,6 +85,28 @@ void Game_Init()
 	//初始化数学引擎
 	Build_Sin_Cos_Tables();
 
+	//初始化单个多边形
+	poly1.state = POLY4DV1_STATE_ACTIVE;
+	poly1.color = 0xFF00FF00;
+	poly1.attr = 0;
+
+	poly1.vlist[0].x = 0;
+	poly1.vlist[0].y = 50;
+	poly1.vlist[0].z = 0;
+	poly1.vlist[0].w = 1;
+
+	poly1.vlist[1].x = 50;
+	poly1.vlist[1].y = -50;
+	poly1.vlist[1].z = 0;
+	poly1.vlist[1].w = 1;
+
+	poly1.vlist[2].x = -50;
+	poly1.vlist[2].y = -50;
+	poly1.vlist[2].z = 0;
+	poly1.vlist[2].w = 1;
+
+	poly1.next = poly1.prev = nullptr;
+
 	//初始化相机
 	Init_CAM4DV1(&cam,
 		CAM_MODEL_EULER,
@@ -99,15 +118,6 @@ void Game_Init()
 		90.0,
 		SCREEN_WIDTH,
 		SCREEN_HEIGHT);
-
-	//加载正方体
-	Load_OBJECT4DV1_PLG(&obj, "cube1.plg", &vscale, &vpos, &vrot);
-
-	//设置正方体在世界中的位置
-	obj.world_pos.x = 0;
-	obj.world_pos.y = 0;
-	obj.world_pos.z = 100;
-
 }
 
 bool SDL_Init()
@@ -180,35 +190,35 @@ void GAME_Main()
 	//drawLine(50, 50, 100, 100, 0xFF0000);
 
 	//初始化渲染列表
-	Reset_OBJECT4DV1(&obj);
+	Reset_RENDERLIST4DV1(&rend_list);
 
-	////多边形插入渲染列表
-	//Insert_POLYF4DV1_RENDERLIST4DV1(&rend_list, &poly1);
+	//多边形插入渲染列表
+	Insert_POLYF4DV1_RENDERLIST4DV1(&rend_list, &poly1);
 
-	//Build_XYZ_Rotation_MATRIX4X4(0, ang_y, 0, &mrot);
+	Build_XYZ_Rotation_MATRIX4X4(0, ang_y, 0, &mrot);
 
-	//if (++ang_y > 360.0) 
-	//	ang_y = 0;
+	if (++ang_y > 360.0) 
+		ang_y = 0;
 
-	//Transform_RENDERLIST4DV1(&rend_list, &mrot, TRANSFORM_LOCAL_ONLY);
+	Transform_RENDERLIST4DV1(&rend_list, &mrot, TRANSFORM_LOCAL_ONLY);
 
-	////执行 本地/模型 到世界转换
-	//Model_To_World_RENDERLIST4DV1(&rend_list, &poly1_pos);
+	//执行 本地/模型 到世界转换
+	Model_To_World_RENDERLIST4DV1(&rend_list, &poly1_pos);
 
-	////生成相机矩阵
-	//Build_CAM4DV1_Matrix_Euler(&cam, CAM_ROT_SEQ_ZYX);
+	//生成相机矩阵
+	Build_CAM4DV1_Matrix_Euler(&cam, CAM_ROT_SEQ_ZYX);
 
-	////应用世界坐标到相机坐标
-	//World_To_Camera_RENDERLIST4DV1(&rend_list, &cam);
+	//应用世界坐标到相机坐标
+	World_To_Camera_RENDERLIST4DV1(&rend_list, &cam);
 
-	////应用相机坐标到投影
-	//Camera_To_Perspective_RENDERLIST4DV1(&rend_list, &cam);
+	//应用相机坐标到投影
+	Camera_To_Perspective_RENDERLIST4DV1(&rend_list, &cam);
 
-	////应用屏幕转换
-	//Perspective_To_Screen_RENDERLIST4DV1(&rend_list, &cam);
+	//应用屏幕转换
+	Perspective_To_Screen_RENDERLIST4DV1(&rend_list, &cam);
 
-	////渲染多边形
-	//Draw_RENDERLIST4DV1_Wire16(&rend_list,pixels, SCREEN_WIDTH);
+	//渲染多边形
+	Draw_RENDERLIST4DV1_Wire16(&rend_list,pixels, SCREEN_WIDTH);
 }
 
 //位图绘制循环
