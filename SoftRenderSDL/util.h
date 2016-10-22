@@ -5,6 +5,14 @@
 #define POLY4DV1_STATE_CLIPPED	0x0002
 #define POLY4DV1_STATE_BACKFACE	0x0004
 
+//对象的定义
+#define OBJECT4DV1_MAX_VERTICES	1024 //64
+#define OBJECT4DV1_MAX_POLYS	1024 //128
+
+//对象的状态
+#define OBJECT4DV1_STATE_ACTIVE		0x0001
+#define OBJECT4DV1_STATE_VISIBLE	0x0002
+#define OBJECT4DV1_STATE_CULLED		0x0004
 
 //渲染列表定义
 #define RENDERLIST4DV1_MAX_POLYS	32768
@@ -47,6 +55,17 @@ typedef struct VECTOR4D_TYP
 	};
 }	VECTOR4D,POINT4D,*VECTOR4D_PTR,*POINT4D_PTR;
 
+//多边形渲染列表
+typedef struct POLY4DV1_TYP
+{
+	int state;	//状态信息
+	int attr;	//多边形物理属性
+	int color;
+
+
+	POINT4D_PTR vlist;
+	int vert[3];
+}POLY4DV1, *POLY4DV1_PTR;
 
 //多边形渲染列表
 typedef struct POLYF4DV1_TYP
@@ -61,6 +80,36 @@ typedef struct POLYF4DV1_TYP
 	POLYF4DV1_TYP *next;
 	POLYF4DV1_TYP *prev;
 }POLYF4DV1,*POLYF4DV1_PTR;
+
+//基于顶点列表和多边形列表的对象
+typedef struct OBJECT4DV1_TYP
+{
+	int id;
+	char name[64];
+
+	int state;	//状态信息
+	int attr;	//多边形物理属性
+
+	float avg_radius;
+	float max_radius;
+
+	POINT4D world_pos;
+
+	VECTOR4D dir;
+
+	VECTOR4D ux,uy,uz;
+
+
+	int num_vertices;
+
+	POINT4D vlist_local[OBJECT4DV1_MAX_VERTICES];//本地顶点数组
+	POINT4D vlist_trans[OBJECT4DV1_MAX_VERTICES];//转换后的顶点数组
+
+	int num_polys;
+
+	POLY4DV1 plist[OBJECT4DV1_MAX_POLYS];
+
+}OBJECT4DV1,*OBJECT4DV1_PTR;
 
 //3d 面
 typedef struct PLANE3D_TYP
@@ -777,4 +826,144 @@ void Draw_RENDERLIST4DV1_Wire16(RENDERLIST4DV1_PTR rend_list, UINT* pixels, int 
 			curr_poly->color,
 			pixels, lpitch);
 	}
+}
+
+char * Get_Line_PLG(char* buffer, int maxlength, FILE *fp)
+{
+	int index = 0;
+	int length = 0;
+
+	//解析循环
+	while (1)
+	{
+		//读取下一行
+		if (!fgets(buffer, maxlength, fp))
+			return NULL;
+
+		//清除空白
+		for (length = strlen(buffer), index = 0; isspace(buffer[index]); index++);
+
+		if (index >= length || buffer[index] == '#')
+			continue;
+
+		return &buffer[index];
+	}
+}
+
+int Load_OBJECT4DV1_PLG(OBJECT4DV1_PTR obj,
+	char *filename,
+	VECTOR4D_PTR scale,
+	VECTOR4D_PTR pos,
+	VECTOR4D_PTR rot)
+{
+
+	FILE *fp;
+	char buffer[256];
+
+	char *token_string;
+
+	//第一步，清理对象和初始化
+	memset(obj, 0, sizeof(OBJECT4DV1));
+
+	obj->state = OBJECT4DV1_STATE_ACTIVE | OBJECT4DV1_STATE_VISIBLE;
+
+	//设置对象的位置
+	obj->world_pos.x = pos->x;
+	obj->world_pos.y = pos->y;
+	obj->world_pos.z = pos->z;
+	obj->world_pos.w = pos->w;
+
+	//第二步，读取文件
+	if (!(fp = fopen(filename, "r")))
+	{
+		printf("Couldn't open PLG file %s", filename);
+		return 0;
+	}
+
+	//第三步，获取第一个令牌字符串做为描述
+	token_string = Get_Line_PLG(buffer, 255, fp);
+	if(!token_string)
+	{
+		printf("PLG file error with file %s(object descriptor invalid)", filename);
+		return 0;
+	}
+
+	printf("object Descriptor:%s", token_string);
+
+	//解析出对象信息
+	sscanf(token_string, "%s %d %d", obj->name, &obj->num_vertices, &obj->num_polys);
+
+	//第四步，加载顶点列表
+	for (int vertex = 0; vertex < obj->num_vertices; vertex++)
+	{
+		//获取下一个顶点
+		if (!(token_string = Get_Line_PLG(buffer, 255, fp)))
+		{
+			printf("PLG file error with file %s(vertex list invalid)", filename);
+			return 0;
+		}
+
+		//解析出顶点
+		sscanf(token_string, "%f %f %f", 
+			&obj->vlist_local[vertex].x, 
+			&obj->vlist_local[vertex].y,
+			&obj->vlist_local[vertex].z);
+
+		obj->vlist_local[vertex].w = 1;
+
+		//缩放顶点
+		obj->vlist_local[vertex].x *= scale->x;
+		obj->vlist_local[vertex].y *= scale->y;
+		obj->vlist_local[vertex].z *= scale->z;
+
+		printf("\nVertex %d = %f,%f,%f,%f", vertex,
+			obj->vlist_local[vertex].x,
+			obj->vlist_local[vertex].y,
+			obj->vlist_local[vertex].z,
+			obj->vlist_local[vertex].w);
+	}
+
+	int poly_surface_desc = 0;
+	int poly_num_verts = 0; //每个多边形的顶点数 （总是3）
+
+	char tmp_string[8];
+
+	//第五步：加载多边形列表
+	for (int poly = 0; poly < obj->num_polys; poly++)
+	{
+		//获取下一个多边形描述
+		if (!(token_string = Get_Line_PLG(buffer, 255, fp)))
+		{
+			printf("\nPLG file error with file %s(多边形描述 invalid)", filename);
+			return 0;
+		}
+
+		printf("\nPolygon:%d", poly);
+
+		//每一个顶点列表必须包含3个顶点，
+		sscanf(token_string, "%s %d %d %d %d", tmp_string,
+			&poly_num_verts,
+			&obj->plist[poly].vert[0],
+			&obj->plist[poly].vert[1],
+			&obj->plist[poly].vert[2]);
+
+		//判断是否是16进制
+		if (tmp_string[0] == '0' && toupper(tmp_string[1]) == 'X')
+			sscanf(tmp_string, "%x", &poly_surface_desc);
+		else
+			poly_surface_desc = atoi(tmp_string);
+
+		obj->plist[poly].vlist = obj->vlist_local;
+
+
+		printf("\nSurface Desc = 0x%.4x,num_verts = %d,vert_indices [%d,%d,%d]", poly_surface_desc,poly_num_verts, 
+			obj->plist[poly].vert[0],
+			obj->plist[poly].vert[1],
+			obj->plist[poly].vert[2]);
+	}
+
+
+	fclose(fp);
+
+	return 1;
 }
