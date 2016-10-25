@@ -1,32 +1,33 @@
+
+#include <string>
+
 #include <windows.h>
 #include <d3d9.h>
 
 #pragma comment(lib, "d3d9.lib")
 
-#include "util.h"
+using namespace std;
 
+#include "DirectxLib.h"
+#include "Model.h"
+#include "Math.h"
+#include "Matrix.h"
 
 /*常量定义*/
 #define WINDOW_WIDTH      635         //窗口尺寸
 #define WINDOW_HEIGHT     480
 
+DirectX m_directx;
+
+Model model(Vector3(0, 0, 0));
 
 /*变量定义*/
 HWND m_hwnd;
 
-IDirect3DDevice9* m_device;			//d3d设备
-IDirect3DSurface9* m_surface;		//directx表面
-D3DSURFACE_DESC m_surfacedesc;   //表面描述
 
 D3DLOCKED_RECT lockedRect;
 
 DWORD*	m_imageData;		//纹理对象
-
-
-CAM4DV1			cam;				//单个相机
-RENDERLIST4DV1 rend_list;			//单个渲染列表
-POLYF4DV1 poly1;					//单个多边形
-POINT4D	poly1_pos = { 0,0,100,1 };	//多边形世界坐标
 
 
 LRESULT CALLBACK sWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -105,113 +106,58 @@ void draw()
 	drawLine(0, 0, 100, 100, 0xffff0000);
 }
 
-bool Game_Init()
+void cube_init()
 {
-	//初始化directx
-	D3DDEVTYPE deviceType = D3DDEVTYPE_HAL;
+	int cube_vertex[24][3] = {
+		{ -1,1,-1 },{ -1,-1,-1 },{ 1,-1,-1 },{ 1,1,-1 },
+		{ 1,1,-1 },{ 1,-1,-1 },{ 1,-1,1 },{ 1,1,1 },
+		{ 1,1,1 },{ 1,-1,1 },{ -1,-1,1 },{ -1,1,1 },
+		{ -1,1,1 },{ -1,-1,1 },{ -1,-1,-1 },{ -1,1,-1 },
+		{ -1,1,1 },{ -1,1,-1 },{ 1,1,-1 },{ 1,1,1 },
+		{ -1,-1,-1 },{ -1,-1,1 },{ 1,-1,1 },{ 1,-1,-1 }
+	};
 
-	HRESULT hr = 0;
 
-	// Step 1: Create the IDirect3D9 object.
+	int colors[24][3] = {
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+		{ 255,0,0 },{ 0,255,0 },{ 0,0,255 },
+	};
 
-	IDirect3D9* d3d9 = 0;
-	d3d9 = Direct3DCreate9(D3D_SDK_VERSION);
 
-	if (!d3d9)
+	int uv[4][2] = {
+		{ 0,0 },{ 0,1 },{ 1,1 },{ 1,0 },
+	};
+
+
+	string path = "pal5q.jpg";
+	model.texture_ = new Texture(path);
+
+	for (int i = 0; i < 24; i++)
 	{
-		::MessageBox(0, "Direct3DCreate9() - FAILED", 0, 0);
-		return false;
+		Vector3 v(cube_vertex[i][0], cube_vertex[i][1], cube_vertex[i][2]);
+		AColor color(0, colors[i][0], colors[i][1], colors[i][2]);
+		Vertex vertex(v, color, uv[i % 4][0], uv[i % 4][1]);
+		model.local_vertexes_.push_back(vertex);
+		model.trans_vertexes_.push_back(Vertex(v+model.world_positon_,color, uv[i % 4][0], uv[i % 4][1]));
 	}
 
-	// Step 2: Check for hardware vp.
+	Matrix model_move_matrix;
+	model_move_matrix.identify();
+	model_move_matrix.setTranslation(Vector3(0, 0, -5));
+	model.world_positon_ = model.world_positon_ * model_move_matrix;
 
-	D3DCAPS9 caps;
-	d3d9->GetDeviceCaps(D3DADAPTER_DEFAULT, deviceType, &caps);
-
-	int vp = 0;
-	if (caps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT)
-		vp = D3DCREATE_HARDWARE_VERTEXPROCESSING;
-	else
-		vp = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
-
-	// Step 3: Fill out the D3DPRESENT_PARAMETERS structure.
-
-	D3DPRESENT_PARAMETERS d3dpp;
-	d3dpp.BackBufferWidth = WINDOW_WIDTH;
-	d3dpp.BackBufferHeight = WINDOW_HEIGHT;
-	d3dpp.BackBufferFormat = D3DFMT_A8R8G8B8;
-	d3dpp.BackBufferCount = 1;
-	d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
-	d3dpp.MultiSampleQuality = 0;
-	d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-	d3dpp.hDeviceWindow = m_hwnd;
-	d3dpp.Windowed = true;
-	d3dpp.EnableAutoDepthStencil = true;
-	d3dpp.AutoDepthStencilFormat = D3DFMT_D24S8;
-	d3dpp.Flags = 0;
-	d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
-	d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
-
-	// Step 4: Create the device.
-
-	hr = d3d9->CreateDevice(
-		D3DADAPTER_DEFAULT, // primary adapter
-		deviceType,         // device type
-		m_hwnd,               // window associated with device
-		vp,                 // vertex processing
-		&d3dpp,             // present parameters
-		&m_device);            // return created device
-
-	if (FAILED(hr))
-	{
-		// try again using a 16-bit depth buffer
-		d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
-
-		hr = d3d9->CreateDevice(
-			D3DADAPTER_DEFAULT,
-			deviceType,
-			m_hwnd,
-			vp,
-			&d3dpp,
-			&m_device);
-
-		if (FAILED(hr))
-		{
-			d3d9->Release(); // done with d3d9 object
-			::MessageBox(0, "CreateDevice() - FAILED", 0, 0);
-			return false;
-		}
-	}
-
-	d3d9->Release(); // done with d3d9 object
-
-	m_device->CreateOffscreenPlainSurface(WINDOW_WIDTH, WINDOW_HEIGHT, D3DFMT_X8R8G8B8, D3DPOOL_DEFAULT, &m_surface, NULL);
-	m_surface->GetDesc(&m_surfacedesc);
-
-	//初始化单个多边形
-	poly1.vlist[0].x = 0;
-	poly1.vlist[0].x = 50;
-	poly1.vlist[0].x = 0;
-	poly1.vlist[0].x = 1;
-
-	poly1.vlist[1].x = 50;
-	poly1.vlist[1].x = -50;
-	poly1.vlist[1].x = 0;
-	poly1.vlist[1].x = 1;
-
-	poly1.vlist[2].x = -50;
-	poly1.vlist[2].x = -50;
-	poly1.vlist[2].x = 0;
-	poly1.vlist[2].x = 1;
-
-	poly1.next = poly1.prev = nullptr;
-
-
-
-	return true;
+	//模型空间旋转
+	Matrix model_rotateY_matrix;
+	model_rotateY_matrix.setRotate(Vector3(0, 1, 0), 45);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow)
+bool Game_Init(HINSTANCE hInstance,int nShowCmd,string name,string title)
 {
 	WNDCLASSEX winClass;
 
@@ -247,11 +193,48 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine,
 		hInstance,                    // program instance handle
 		NULL);                        // creation parameters
 
-
-	Game_Init();
-
 	ShowWindow(m_hwnd, SW_SHOW);
 	UpdateWindow(m_hwnd);
+
+
+	//DirectX初始化
+	m_directx.initialDirectX(hInstance, m_hwnd, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+	//Cube初始化
+	cube_init();
+
+
+	//初始化单个多边形
+	poly1.vlist[0].x = 0;
+	poly1.vlist[0].x = 50;
+	poly1.vlist[0].x = 0;
+	poly1.vlist[0].x = 1;
+
+	poly1.vlist[1].x = 50;
+	poly1.vlist[1].x = -50;
+	poly1.vlist[1].x = 0;
+	poly1.vlist[1].x = 1;
+
+	poly1.vlist[2].x = -50;
+	poly1.vlist[2].x = -50;
+	poly1.vlist[2].x = 0;
+	poly1.vlist[2].x = 1;
+
+	poly1.next = poly1.prev = nullptr;
+
+
+
+	return true;
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow)
+{
+	//创建窗口
+	string windowClassName = "MyWindow";
+
+	string title = "3DRender";
+
+	Game_Init(hInstance, iCmdShow, windowClassName, title);
 
 	MSG    msg;
 	ZeroMemory(&msg, sizeof(msg));

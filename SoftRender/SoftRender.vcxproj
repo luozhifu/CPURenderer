@@ -111,10 +111,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DirectxLib.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Math.cpp" />
+    <ClCompile Include="Matrix.cpp" />
+    <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="Vector3.cpp" />
+    <ClCompile Include="Vertex.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="util.h" />
+    <ClInclude Include="DirectxLib.h" />
+    <ClInclude Include="Math.h" />
+    <ClInclude Include="Matrix.h" />
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="Texture.h" />
+    <ClInclude Include="Vector3.h" />
+    <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
