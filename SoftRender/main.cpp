@@ -12,23 +12,49 @@ using namespace std;
 #include "Model.h"
 #include "Math.h"
 #include "Matrix.h"
+#include "Camera.h"
+#include "Enum.h"
 
 /*常量定义*/
-#define WINDOW_WIDTH      635         //窗口尺寸
-#define WINDOW_HEIGHT     480
+#define WINDOW_WIDTH      800         //窗口尺寸
+#define WINDOW_HEIGHT     800
 
 DirectX m_directx;
 
-Model model(Vector3(0, 0, 0));
+Model model(Vector3(0, 0, 8));
 
-/*变量定义*/
-HWND m_hwnd;
+Camera camera;
+
+State g_game_state = MODEL_TRANSFORM;
+RenderState g_render_state = COLOR;
+
+//旋转幅度
+const float g_rotate_thera = 3.5;
+
+struct ModelTransAttribute
+{
+	float posZ;
+	float rotate_theta;
+	float scale;
+}g_model;
+
+struct CameraTransAttribute
+{
+	float posX, posY, posZ;
+	float rotateX, rotateY;
+}g_camera;
 
 
-D3DLOCKED_RECT lockedRect;
+void transform_attribute_init()
+{
+	g_model.posZ = 0.0f;
+	g_model.rotate_theta = 0.0f;
+	g_model.scale = 1.0f;
 
-DWORD*	m_imageData;		//纹理对象
-
+	g_camera.posX = g_camera.posY = g_camera.posZ = 0.0f;
+	g_camera.posZ = 0.0f;
+	g_camera.rotateX = g_camera.rotateY = 0.0f;
+}
 
 LRESULT CALLBACK sWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -38,11 +64,86 @@ LRESULT CALLBACK sWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		//draw();
 		break;
 	case WM_KEYDOWN:
-		switch (wParam)
+		if (wParam == VK_ESCAPE)
 		{
-		case VK_ESCAPE:
 			SendMessage(hwnd, WM_CLOSE, 0, 0);
+		}
+		else if (wParam == VK_SPACE)
+		{
+			g_game_state = g_game_state == MODEL_TRANSFORM ? CAMERA_TRANSFORM : MODEL_TRANSFORM;
+		}
+		else if(wParam == VK_TAB)
+		{
+			switch (g_render_state)
+			{
+			case WIREFRAME:
+				g_render_state = TEXTURE;
+				break;
+			case TEXTURE:
+				g_render_state = COLOR;
+				break;
+			case COLOR:
+				g_render_state = WIREFRAME;
+				break;
+			}
 			break;
+		}
+
+		switch (g_game_state)
+		{
+		case MODEL_TRANSFORM:
+			if (wParam == VK_UP)
+			{
+				g_model.posZ += 0.1f;
+			}
+			else if (wParam == VK_DOWN)
+			{
+				g_model.posZ -= 0.1f;
+			}
+			else if(wParam == VK_LEFT)
+			{
+				g_model.rotate_theta += g_rotate_thera;
+			}
+			else if (wParam == VK_RIGHT)
+			{
+				g_model.rotate_theta -= g_rotate_thera;
+			}
+			else if (wParam == VK_NUMPAD1)
+			{
+				g_model.scale += 0.01f;
+			}
+			else if (wParam == VK_NUMPAD2)
+			{
+				g_model.scale -= 0.01f;
+			}
+			break;
+		case CAMERA_TRANSFORM:
+			if (wParam == VK_UP)
+			{
+				g_camera.posY += 0.1f;
+			}
+			else if (wParam == VK_DOWN)
+			{
+				g_camera.posY -= 0.1f;
+			}
+			else if (wParam == VK_LEFT)
+			{
+				g_camera.posX += 0.1f;
+			}
+			else if (wParam == VK_RIGHT)
+			{
+				g_camera.posX -= 0.1f;
+			}
+			else if (wParam == VK_NUMPAD1)
+			{
+				g_camera.posZ += 0.1f;
+			}
+			else if (wParam == VK_NUMPAD2)
+			{
+				g_camera.posZ -= 0.1f;
+			}
+			break;
+
 		}
 		break;
 	case WM_DESTROY:
@@ -51,59 +152,6 @@ LRESULT CALLBACK sWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return DefWindowProc(hwnd, msg, wParam, lParam);
-}
-
-void setPixels(UINT x, UINT y, UINT color)
-{
-	UINT index = y * lockedRect.Pitch/4 + x;
-	m_imageData[index] = color;
-}
-
-void drawLine(int x1, int y1, int x2, int y2, UINT color)
-{
-	int dx = x2 - x1;
-	int dy = y2 - y1;
-	int ux = ((dx > 0) << 1) - 1;//x的增量方向,取1或-1
-	int uy = ((dy > 0) << 1) - 1;//y的增量方向,取1或-1
-
-	dx = abs(dx);
-	dy = abs(dy);
-
-	int x = x1, y = y1;
-	int eps = 0;
-
-	//线段靠近x轴
-	if (dx > dy)
-	{
-		for (x = x1; x != x2 + ux; x += ux)
-		{
-			setPixels(x, y, color);
-			eps += dy;
-			if ((eps << 1) >= dx)
-			{
-				y += uy;
-				eps -= dx;
-			}
-		}
-	}
-	else
-	{
-		for (y = y1; y != y2 + uy; y += uy)
-		{
-			setPixels(x, y, color);
-			eps += dx;
-			if ((eps << 1) >= dy)
-			{
-				x += ux;
-				eps -= dy;
-			}
-		}
-	}
-}
-
-void draw()
-{
-	drawLine(0, 0, 100, 100, 0xffff0000);
 }
 
 void cube_init()
@@ -147,17 +195,136 @@ void cube_init()
 		model.trans_vertexes_.push_back(Vertex(v+model.world_positon_,color, uv[i % 4][0], uv[i % 4][1]));
 	}
 
-	Matrix model_move_matrix;
-	model_move_matrix.identify();
-	model_move_matrix.setTranslation(Vector3(0, 0, -5));
-	model.world_positon_ = model.world_positon_ * model_move_matrix;
+	//Matrix model_move_matrix;
+	//model_move_matrix.identify();
+	//model_move_matrix.setTranslation(Vector3(0, 0, 100));
+	//model.world_positon_ = model.world_positon_ * model_move_matrix;
 
-	//模型空间旋转
-	Matrix model_rotateY_matrix;
-	model_rotateY_matrix.setRotate(Vector3(0, 1, 0), 45);
+	////模型空间旋转
+	//Matrix model_rotateY_matrix;
+	//model_rotateY_matrix.setRotate(Vector3(0, 1, 0), 45);
+	//Matrix model_rotateX_matrix;
+	//model_rotateX_matrix.setRotate(Vector3(1, 0, 0), 45);
+	//Matrix model_rotateZ_matrix;
+	//model_rotateZ_matrix.setRotate(Vector3(0, 0, 1), 45);
+	//Matrix matrix = model_rotateX_matrix * model_rotateY_matrix * model_rotateZ_matrix;
+
+	//for (int index = 0; index < model.local_vertexes_.size(); index++)
+	//{
+	//	Vertex& v = model.local_vertexes_[index];
+	//	Vector3 modelVector = v.position_ * matrix;
+	//	model.trans_vertexes_[index].position_ = modelVector + model.world_positon_;
+	//	model.trans_vertexes_[index].normal_ = v.normal_;
+	//}
+
+	//Matrix model_rotate_matrix;
+	//model_rotate_matrix.setRotate(Vector3(0, 1, 0), 60);
+
+	//for (int index = 0; index < model.local_vertexes_.size(); index++)
+	//{
+	//	Vertex& v = model.trans_vertexes_[index];
+	//	Vector3 modelVector = 0.5f * v.position_;
+	//	modelVector = modelVector * model_rotate_matrix;
+	//	model.trans_vertexes_[index].position_ = modelVector + model.world_positon_;
+	//}
+
+	model.polyindices_.push_back(TrangleIndex(0, 1, 2));
+	model.polyindices_.push_back(TrangleIndex(2, 3, 0));//前
+
+	model.polyindices_.push_back(TrangleIndex(4, 5, 6));
+	model.polyindices_.push_back(TrangleIndex(6, 7, 4));//右
+
+	model.polyindices_.push_back(TrangleIndex(8, 9, 10));
+	model.polyindices_.push_back(TrangleIndex(10, 11, 8));//后
+
+	model.polyindices_.push_back(TrangleIndex(12, 13, 14));
+	model.polyindices_.push_back(TrangleIndex(14, 15, 12));//左
+
+	model.polyindices_.push_back(TrangleIndex(16, 17, 18));
+	model.polyindices_.push_back(TrangleIndex(18, 19, 16));//上
+
+	model.polyindices_.push_back(TrangleIndex(20, 21, 22));
+	model.polyindices_.push_back(TrangleIndex(22, 23, 20));//下
 }
 
-bool Game_Init(HINSTANCE hInstance,int nShowCmd,string name,string title)
+void drawcube(RenderState renderState)
+{
+	//世界变换
+
+	//模型空间平移
+	Matrix model_move_matrix;
+	model_move_matrix.identify();
+	model_move_matrix.setTranslation(Vector3(0, 0, g_model.posZ));
+
+	model.world_positon_ = model.world_positon_ * model_move_matrix;
+
+	//旋转
+	Matrix model_rotate_matrix;
+	model_rotate_matrix.setRotate(Vector3(0, 1, 0), g_model.rotate_theta);
+
+	//缩放
+	Matrix model_scale_matrix;
+	model_scale_matrix.setScale(Vector3(g_model.scale, g_model.scale, g_model.scale));
+
+	Matrix model_transform = model_rotate_matrix * model_scale_matrix;
+
+	//转换到世界坐标系
+	for (int index = 0; index < model.local_vertexes_.size(); index++)
+	{
+		Vertex& v = model.local_vertexes_[index];
+
+		model.trans_vertexes_[index].position_ = v.position_ * model_transform + model.world_positon_;
+	}
+
+	//取景变换
+
+	//相机移动
+	Matrix camera_move_matrix;
+	camera_move_matrix.identify();
+	camera_move_matrix.setTranslation(Vector3(g_camera.posX, g_camera.posY, g_camera.posZ));
+
+	//相机旋转
+	camera.set_lookAt(Vector3(g_camera.rotateX, g_camera.rotateY, 0));
+	camera.set_position(camera_move_matrix);
+
+	//转换到相机坐标
+	camera.viewtransform(model.trans_vertexes_);
+
+
+	//透视除法
+	for (int index = 0; index < model.trans_vertexes_.size(); index++)
+	{
+		Vertex& v = model.trans_vertexes_[index];
+		v.position_.x /= v.position_.w;
+		v.position_.y /= v.position_.w;
+		v.position_.z /= v.position_.w;
+		v.position_.w = 1 / v.position_.w;
+	}
+
+
+	//窗口变换
+	int half_width = WINDOW_WIDTH / 2;
+	int half_height = WINDOW_HEIGHT / 2;
+	for (int index = 0; index < model.trans_vertexes_.size(); index++)
+	{
+		Vertex& v = model.trans_vertexes_[index];
+		v.position_.x *= half_width;
+		v.position_.x += half_width;
+
+		v.position_.y *= half_height;
+		v.position_.y = half_height - v.position_.y;
+	}
+
+	//绘制线框模型
+	switch (renderState)
+	{
+	case WIREFRAME:
+		m_directx.drawwireframe_model(model);
+		break;
+	}
+}
+
+HWND Game_Init(HINSTANCE hInstance,int nShowCmd,string name,string title)
 {
 	WNDCLASSEX winClass;
 
@@ -177,10 +344,10 @@ bool Game_Init(HINSTANCE hInstance,int nShowCmd,string name,string title)
 	if (!RegisterClassEx(&winClass))
 	{
 		MessageBox(NULL, TEXT("This program requires Windows NT!"), "error", MB_ICONERROR);
-		return 1;
+		return nullptr;
 	}
 
-	m_hwnd = CreateWindowEx(NULL,
+	HWND hwnd = CreateWindowEx(NULL,
 		"DirectSurface",                    // window class name
 		"Draw Surface",            // window caption
 		WS_OVERLAPPEDWINDOW,         // window style
@@ -193,38 +360,44 @@ bool Game_Init(HINSTANCE hInstance,int nShowCmd,string name,string title)
 		hInstance,                    // program instance handle
 		NULL);                        // creation parameters
 
-	ShowWindow(m_hwnd, SW_SHOW);
-	UpdateWindow(m_hwnd);
+	ShowWindow(hwnd, SW_SHOW);
+	UpdateWindow(hwnd);
 
 
 	//DirectX初始化
-	m_directx.initialDirectX(hInstance, m_hwnd, WINDOW_WIDTH, WINDOW_HEIGHT);
+	m_directx.initialDirectX(hInstance, hwnd, WINDOW_WIDTH, WINDOW_HEIGHT);
 
 	//Cube初始化
 	cube_init();
 
+	transform_attribute_init();
 
-	//初始化单个多边形
-	poly1.vlist[0].x = 0;
-	poly1.vlist[0].x = 50;
-	poly1.vlist[0].x = 0;
-	poly1.vlist[0].x = 1;
+	camera.set_wh(WINDOW_WIDTH / WINDOW_HEIGHT);
 
-	poly1.vlist[1].x = 50;
-	poly1.vlist[1].x = -50;
-	poly1.vlist[1].x = 0;
-	poly1.vlist[1].x = 1;
+	return hwnd;
+}
 
-	poly1.vlist[2].x = -50;
-	poly1.vlist[2].x = -50;
-	poly1.vlist[2].x = 0;
-	poly1.vlist[2].x = 1;
+void gameUpdate(HWND hwnd)
+{
+	//	drawLine(0, 0, 100, 100, 0xffff0000);
 
-	poly1.next = poly1.prev = nullptr;
+	m_directx.fillSurface();
+	m_directx.lockSurface();
 
+	//m_directx.drawLine(0, 0, 100, 100, AColor(0, 255, 0, 0));
 
+	drawcube(g_render_state);
 
-	return true;
+	m_directx.unlockSurface();
+
+	m_directx.flipSurface();
+
+//	transform_attribute_init();
+}
+
+void gameEnd(string wcName, HINSTANCE hInstance)
+{
+	UnregisterClass(wcName.c_str(), hInstance);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow)
@@ -234,7 +407,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine,
 
 	string title = "3DRender";
 
-	Game_Init(hInstance, iCmdShow, windowClassName, title);
+	HWND hwnd = Game_Init(hInstance, iCmdShow, windowClassName, title);
 
 	MSG    msg;
 	ZeroMemory(&msg, sizeof(msg));
@@ -254,39 +427,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine,
 			DispatchMessage(&msg);
 		} // end while
 
+		gameUpdate(hwnd);
 
-		m_surface->LockRect(&lockedRect, 0, 0);
-
-		m_imageData = (DWORD*)lockedRect.pBits;
-
-		int w = lockedRect.Pitch / 4;
-
-		draw();
-
-
-		m_surface->UnlockRect();
-
-		//渲染
-		m_device->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffffffff, 1.0f, 0);
-		m_device->BeginScene();
-
-		IDirect3DSurface9 * pBackBuffer = NULL;
-
-		m_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer);
-		m_device->StretchRect(m_surface, NULL, pBackBuffer, NULL, D3DTEXF_LINEAR);
-
-		m_device->EndScene();
-		m_device->Present(0, 0, 0, 0);
-
-		pBackBuffer->Release();
 	}
-	
-	
 
 	//释放资源
-	m_device->Release();
-	if (m_surface)
-		m_surface->Release();
+	gameEnd(windowClassName, hInstance);
 
 	return 0;
 }

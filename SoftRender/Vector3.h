@@ -2,15 +2,28 @@
 class Vector3
 {
 public:
-	Vector3(float x, float y, float z, float w = 1) :x_(x), y_(y), z_(z), w_(w) {}
-	Vector3() :x_(), y_(), z_(), w_(1) {}
-	Vector3(const Vector3& v) :x_(v.x_), y_(v.y_), z_(v.z_), w_(v.w_) {}
+	Vector3(float x, float y, float z, float w = 1) :x(x), y(y), z(z), w(w) {}
+	Vector3() :x(), y(), z(), w(1) {}
+	Vector3(const Vector3& v) :x(v.x), y(v.y), z(v.z), w(v.w) {}
 
-	Vector3 operator+(const Vector3&v)const { return Vector3(x_ + v.x_, y_ + v.y_, z_ + v.z_); }
+	Vector3 operator+(const Vector3&v)const { return Vector3(x + v.x, y + v.y, z + v.z); }
 
-	float x_;
-	float y_;
-	float z_;
-	float w_;
+	union {
+
+		float M[4];
+		struct {
+			float x,y,z,w;
+		};
+	};
+
 };
 
+inline float operator*(const Vector3& v, const Vector3& v1)
+{
+	return v1.x*v.x + v1.y*v.y + v1.z*v.z;
+}
+
+inline Vector3 operator*(float f, const Vector3& v1)
+{
+	return Vector3(v1.x*f,v1.y*f , v1.z*f);
+}

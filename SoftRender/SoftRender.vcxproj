@@ -111,6 +111,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DirectxLib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Math.cpp" />
@@ -120,7 +121,9 @@
     <ClCompile Include="Vertex.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="DirectxLib.h" />
+    <ClInclude Include="Enum.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="Model.h" />

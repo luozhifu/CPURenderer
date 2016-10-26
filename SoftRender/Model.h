@@ -30,7 +30,7 @@ public:
 	vector<Vertex> local_vertexes_;
 	vector<Vertex> trans_vertexes_;
 
-	vector<TrangleIndex> poly_indices_;
+	vector<TrangleIndex> polyindices_;
 
 	Texture* texture_;
 };

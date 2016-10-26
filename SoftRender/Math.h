@@ -1,4 +1,9 @@
 #pragma once
+
+#include <cmath>
+
+#define PI 3.141592654
+
 class AColor
 {
 public:
@@ -12,3 +17,6 @@ public:
 
 };
 
+float Sin(float degree);
+float Cos(float degree);
+float Tan(float degree);

@@ -82,9 +82,120 @@ bool DirectX::initialDirectX(HINSTANCE hInstance, HWND hWnd, int width, int heig
 
 	d3d9->Release(); // done with d3d9 object
 
+	//创建一个绘制表面
 	m_device->CreateOffscreenPlainSurface(width, height, D3DFMT_X8R8G8B8, D3DPOOL_DEFAULT, &m_surface, NULL);
 	m_surface->GetDesc(&m_surfacedesc);
 
+	//保存屏幕宽、席、Z缓存区大小
+	width_ = width;
+	height_ = height;
+	buffer_size_ = width * height;
+
+	//zbuffer开辟空间
+	zbuffer_ = new float[buffer_size_];
+
 
 	return true;
+}
+
+void DirectX::fillSurface()
+{
+	m_device->ColorFill(m_surface, NULL, D3DCOLOR_XRGB(0, 0, 0));
+	fill(zbuffer_, zbuffer_ + buffer_size_, FLT_MAX);
+}
+
+void DirectX::lockSurface()
+{
+	//创建并初始化锁定区域
+	memset(&lockedRect, 0, sizeof(lockedRect));
+	m_surface->LockRect(&lockedRect, NULL, D3DLOCK_DISCARD);
+}
+
+void DirectX::unlockSurface()
+{
+	m_surface->UnlockRect();
+}
+
+void DirectX::drawPixel(int x, int y, AColor color, float depth)
+{
+	DWORD* imageData = (DWORD*)lockedRect.pBits;
+
+	int w = lockedRect.Pitch / 4;
+
+	UINT index = y * w + x;
+	imageData[index] = ARGB(color.a_,color.r_, color.g_, color.b_);
+}
+
+void DirectX::drawLine(int x1, int y1, int x2, int y2, AColor color)
+{
+	int dx = x2 - x1;
+	int dy = y2 - y1;
+	int ux = ((dx > 0) << 1) - 1;//x的增量方向,取1或-1
+	int uy = ((dy > 0) << 1) - 1;//y的增量方向,取1或-1
+
+	dx = abs(dx);
+	dy = abs(dy);
+
+	int x = x1, y = y1;
+	int eps = 0;
+
+	//线段靠近x轴
+	if (dx > dy)
+	{
+		for (x = x1; x != x2 + ux; x += ux)
+		{
+			drawPixel(x, y, color);
+			eps += dy;
+			if ((eps << 1) >= dx)
+			{
+				y += uy;
+				eps -= dx;
+			}
+		}
+	}
+	else
+	{
+		for (y = y1; y != y2 + uy; y += uy)
+		{
+			drawPixel(x, y, color);
+			eps += dx;
+			if ((eps << 1) >= dy)
+			{
+				x += ux;
+				eps -= dy;
+			}
+		}
+	}
+}
+
+void DirectX::flipSurface()
+{
+	//获得后台缓存
+	IDirect3DSurface9 * pBackBuffer = NULL;
+
+	//使用自定义表面填充后台缓存
+	m_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer);
+	m_device->StretchRect(m_surface, NULL, pBackBuffer, NULL, D3DTEXF_LINEAR);
+
+	//释放缓存，否则或内存泄露
+	pBackBuffer->Release();
+
+	//将交换链中的后台缓存显示
+	m_device->Present(0, 0, 0, 0);
+}
+
+void DirectX::drawwireframe_model(Model & model)
+{
+	for (TrangleIndex& v : model.polyindices_)
+	{
+		Vertex v1 = model.trans_vertexes_[v.indices[0]];
+		Vertex v2 = model.trans_vertexes_[v.indices[1]];
+		Vertex v3 = model.trans_vertexes_[v.indices[2]];
+
+		AColor color(0, 255, 0, 0);
+
+		drawLine(v1.position_.x, v1.position_.y, v2.position_.x, v2.position_.y, color);
+		drawLine(v3.position_.x, v3.position_.y, v2.position_.x, v2.position_.y, color);
+		drawLine(v1.position_.x, v1.position_.y, v3.position_.x, v3.position_.y, color);
+	}
 }
