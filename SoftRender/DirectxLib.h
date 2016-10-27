@@ -32,7 +32,9 @@ public:
 
 
 	//绘制线框模型
-	void drawwireframe_model(Model& model);
+	void drawwireframe_model(Model& model,const set<int> remove_vertex_index,const set<int> remove_triangle_index);
+
+	bool is_out(TrangleIndex &triangle, const set<int> &remove_vertex_index);
 
 private:
 

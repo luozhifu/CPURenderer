@@ -46,3 +46,25 @@ void Camera::canonicalViewvolume(vector<Vertex>& vertexes)
 		v.position_ = v.position_ * cvv_matrix;
 	}
 }
+
+bool Camera::is_back(const Vector3 &v1, const Vector3 &v2, const Vector3 &v3)
+{
+	Vector3 vec13 = v3 - v1;
+	Vector3 vec12 = v2 - v1;
+	Vector3 vv = cross_product(vec13, vec12);
+	return (vv*v1)>0;
+}
+
+int Camera::transform_check_cvv(const Vector3 &v)
+{
+	int check = 0;
+
+	if (v.z < -1.0f) check |= 1;
+	if (v.z > 1.0f)  check |= 2;
+	if (v.x < -1.0f) check |= 4;
+	if (v.x > 1.0f)  check |= 8;
+	if (v.y < -1.0f) check |= 16;
+	if (v.y > 1.0f)  check |= 32;
+
+	return check;
+}

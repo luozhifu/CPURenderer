@@ -291,6 +291,24 @@ void drawcube(RenderState renderState)
 	camera.viewtransform(model.trans_vertexes_);
 
 
+	//CVV²Ã¼ô
+	set<int> remove_triangle_index;
+	// 4.3.2 ¼ÇÂ¼ÌÞ³ýÈý½ÇÐÎ
+	int index2 = 0;
+	for (auto v : model.polyindices_)
+	{
+		//±³ÃæÌÞ³ý
+		Vector3 v1 = model.trans_vertexes_[v.indices[0]].position_;
+		Vector3 v2 = model.trans_vertexes_[v.indices[1]].position_;
+		Vector3 v3 = model.trans_vertexes_[v.indices[2]].position_;
+		if (camera.is_back(v1, v2, v3))
+		{
+			remove_triangle_index.insert(index2);
+		}
+		index2++;
+	}
+	camera.canonicalViewvolume(model.trans_vertexes_);
+
 	//Í¸ÊÓ³ý·¨
 	for (int index = 0; index < model.trans_vertexes_.size(); index++)
 	{
@@ -299,6 +317,15 @@ void drawcube(RenderState renderState)
 		v.position_.y /= v.position_.w;
 		v.position_.z /= v.position_.w;
 		v.position_.w = 1 / v.position_.w;
+	}
+
+	set<int> remove_vertex_index;
+	//¼ÇÂ¼ÌÞ³ýµã
+	for (int index = 0; index < model.trans_vertexes_.size(); index++)
+	{
+		Vertex& v = model.trans_vertexes_[index];
+		if (camera.transform_check_cvv(v.position_))
+			remove_vertex_index.insert(index);
 	}
 
 
@@ -319,7 +346,7 @@ void drawcube(RenderState renderState)
 	switch (renderState)
 	{
 	case WIREFRAME:
-		m_directx.drawwireframe_model(model);
+		m_directx.drawwireframe_model(model,remove_vertex_index,remove_triangle_index);
 		break;
 	}
 }

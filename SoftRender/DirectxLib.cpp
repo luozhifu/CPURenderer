@@ -184,10 +184,15 @@ void DirectX::flipSurface()
 	m_device->Present(0, 0, 0, 0);
 }
 
-void DirectX::drawwireframe_model(Model & model)
+void DirectX::drawwireframe_model(Model & model, const set<int> remove_vertex_index, const set<int> remove_triangle_index)
 {
-	for (TrangleIndex& v : model.polyindices_)
+	for (int index = 0; index < model.polyindices_.size(); index++)
 	{
+		TrangleIndex v = model.polyindices_[index];
+		//剔除或不在视锥内
+		if (remove_triangle_index.count(index) || is_out(v, remove_vertex_index))
+			continue;
+
 		Vertex v1 = model.trans_vertexes_[v.indices[0]];
 		Vertex v2 = model.trans_vertexes_[v.indices[1]];
 		Vertex v3 = model.trans_vertexes_[v.indices[2]];
@@ -198,4 +203,15 @@ void DirectX::drawwireframe_model(Model & model)
 		drawLine(v3.position_.x, v3.position_.y, v2.position_.x, v2.position_.y, color);
 		drawLine(v1.position_.x, v1.position_.y, v3.position_.x, v3.position_.y, color);
 	}
+}
+
+bool DirectX::is_out(TrangleIndex & triangle, const set<int>& remove_vertex_index)
+{
+	for (auto i : triangle.indices)
+	{
+		if (remove_vertex_index.count(i))
+			return true;
+	}
+
+	return false;
 }
