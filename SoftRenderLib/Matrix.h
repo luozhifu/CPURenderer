@@ -2,7 +2,7 @@
 
 #include <cassert>
 #include "Vector3.h"
-#include "Math.h"
+#include "GMath.h"
 
 class Matrix
 {

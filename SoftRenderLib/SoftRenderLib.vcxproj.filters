@@ -15,39 +15,36 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Camera.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Matrix.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="DirectxLib.cpp">
+    <ClCompile Include="Texture.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Vector3.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Texture.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Vertex.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Math.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Camera.cpp">
+    <ClCompile Include="GMath.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Enum.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
     <ClInclude Include="Matrix.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="DirectxLib.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Vector3.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Model.h">
@@ -56,16 +53,13 @@
     <ClInclude Include="Texture.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Vector3.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
     <ClInclude Include="Vertex.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Math.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Enum.h">
+    <ClInclude Include="GMath.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

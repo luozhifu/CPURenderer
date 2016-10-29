@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2287BC79-3F9D-4D7E-9FF8-98B41785CB36}</ProjectGuid>
     <RootNamespace>SoftRender</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
     <ProjectName>SoftRenderSurface</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -54,8 +54,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
-  <ImportGroup Label="Shared">
-  </ImportGroup>
+  <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -72,6 +71,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>d:\vs\bin\$(ProjectName)\$(Configuration)\</OutDir>
     <IntDir>d:\vs\obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <IncludePath>$(SolutionDir)SoftRenderLib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -114,25 +114,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DirectxLib.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Math.cpp" />
-    <ClCompile Include="Matrix.cpp" />
-    <ClCompile Include="Texture.cpp" />
-    <ClCompile Include="Vector3.cpp" />
-    <ClCompile Include="Vertex.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Camera.h" />
     <ClInclude Include="DirectxLib.h" />
-    <ClInclude Include="Enum.h" />
-    <ClInclude Include="Math.h" />
-    <ClInclude Include="Matrix.h" />
-    <ClInclude Include="Model.h" />
-    <ClInclude Include="Texture.h" />
-    <ClInclude Include="Vector3.h" />
-    <ClInclude Include="Vertex.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SoftRenderLib\SoftRenderLib.vcxproj">
+      <Project>{e4c90f46-c2ee-476d-8bad-064a7d973811}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

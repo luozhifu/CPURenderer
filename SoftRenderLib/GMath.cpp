@@ -1,4 +1,4 @@
-#include "Math.h"
+#include "GMath.h"
 
 float Sin(float degree)
 {
